@@ -1152,6 +1152,7 @@ document.getElementById("pg-next").addEventListener("click", () => {
 
 function selectHub(hubId) {
   if (activePath) return;
+  fadeBubblesAway(); // always fade bubbles when user picks a hub directly
   if (hubId === "all" || (selectedHubIds.size === 1 && selectedHubIds.has(hubId))) {
     selectedHubIds.clear(); targetRotX = null; targetRotY = null;
     autoRotate = true; setActiveNav("all"); hideContentPanel(); return;
