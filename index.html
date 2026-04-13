@@ -1140,6 +1140,7 @@ function applyPathStep() {
 function activatePath(pathKey) {
   activePath = pathKey;
   pathStep   = 0;
+  fadeBubblesAway(); // always kill bubbles when any path activates
   const p    = PATHS[pathKey];
   drawPathLines(p.hubs, p.color);
   document.getElementById("path-guide").classList.add("visible");
@@ -1403,7 +1404,9 @@ window.addEventListener("mouseup", e => {
 // ── TOUCH HANDLING (window-level, catches all touches) ───────────────────────
 
 let isTouchDragging = false, lastTouchX = 0, lastTouchY = 0;
+let touchStartX = 0, touchStartY = 0; // fixed origin for drag threshold
 let lastPinchDist = 0, isPinching = false;
+const DRAG_THRESHOLD = 8; // px — must move more than this to count as drag
 
 function pinchDist(e) {
   const dx = e.touches[0].clientX - e.touches[1].clientX;
@@ -1411,18 +1414,15 @@ function pinchDist(e) {
   return Math.sqrt(dx * dx + dy * dy);
 }
 
-function touchInCanvas(e) {
-  // true if at least one touch point is inside the canvas container
+function pointInCanvas(x, y) {
   const rect = container.getBoundingClientRect();
-  return Array.from(e.touches).some(t =>
-    t.clientX >= rect.left && t.clientX <= rect.right &&
-    t.clientY >= rect.top  && t.clientY <= rect.bottom
-  );
+  return x >= rect.left && x <= rect.right && y >= rect.top && y <= rect.bottom;
 }
 
 window.addEventListener("touchstart", e => {
-  if (!touchInCanvas(e)) return;
-  e.preventDefault(); // always block default inside canvas (no scroll, no native zoom)
+  const t0 = e.touches[0];
+  if (!pointInCanvas(t0.clientX, t0.clientY) && e.touches.length < 2) return;
+  e.preventDefault();
   if (e.touches.length >= 2) {
     isPinching = true;
     isTouchDragging = true;
@@ -1431,26 +1431,30 @@ window.addEventListener("touchstart", e => {
   }
   isPinching = false;
   isTouchDragging = false;
-  const t = e.touches[0];
-  lastTouchX = t.clientX; lastTouchY = t.clientY;
+  lastTouchX = touchStartX = t0.clientX;
+  lastTouchY = touchStartY = t0.clientY;
   autoRotate = false;
 }, { passive: false });
 
 window.addEventListener("touchmove", e => {
-  if (!touchInCanvas(e)) return;
   e.preventDefault();
   if (e.touches.length >= 2) {
     isPinching = true;
     isTouchDragging = true;
     const dist = pinchDist(e);
-    const delta = lastPinchDist - dist; // positive = fingers closer = zoom out
+    const delta = lastPinchDist - dist;
     camera.position.z = Math.max(MIN_Z, Math.min(MAX_Z, camera.position.z + delta * 0.07));
     lastPinchDist = dist;
     return;
   }
   if (e.touches.length === 1 && !isPinching) {
-    isTouchDragging = true;
     const t = e.touches[0];
+    const totalDx = t.clientX - touchStartX;
+    const totalDy = t.clientY - touchStartY;
+    // Only mark as drag after crossing threshold — prevents tap being eaten
+    if (Math.abs(totalDx) > DRAG_THRESHOLD || Math.abs(totalDy) > DRAG_THRESHOLD) {
+      isTouchDragging = true;
+    }
     const dx = t.clientX - lastTouchX, dy = t.clientY - lastTouchY;
     rotY += dx * 0.010; rotX += dy * 0.010;
     rotX = Math.max(-Math.PI / 2, Math.min(Math.PI / 2, rotX));
@@ -1462,11 +1466,9 @@ window.addEventListener("touchmove", e => {
 window.addEventListener("touchend", e => {
   if (e.touches.length < 2) isPinching = false;
   if (e.touches.length === 0) {
-    if (!isTouchDragging) {
-      const t = e.changedTouches[0];
-      if (touchInCanvas(e) || (t.clientX >= container.getBoundingClientRect().left)) {
-        handleClick(t.clientX, t.clientY);
-      }
+    const t = e.changedTouches[0];
+    if (!isTouchDragging && pointInCanvas(t.clientX, t.clientY)) {
+      handleClick(t.clientX, t.clientY);
     }
     isTouchDragging = false;
     if (selectedHubIds.size === 0 && !activePath) autoRotate = true;
