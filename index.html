@@ -366,6 +366,15 @@
   @media (max-width: 860px) {
     #content-panel { width: 100%; top: 52px; bottom: 44px; }
     #cp-admin-bar { position: sticky; bottom: 0; }
+    /* Path guide: full-width strip above bottom bar, not floating over content */
+    #path-guide {
+      left: 0; right: 0; bottom: 44px;
+      border-radius: 14px 14px 0 0;
+      max-width: 100%; min-width: 100%;
+      box-sizing: border-box;
+    }
+    /* Push content panel up when path guide is visible */
+    body.path-active #content-panel { bottom: 208px; }
   }
 </style>
 </head>
@@ -1122,6 +1131,7 @@ function activatePath(pathKey) {
   drawPathLines(p.hubs, p.color);
   document.getElementById("path-guide").classList.add("visible");
   document.getElementById("controls").style.display = "none";
+  document.body.classList.add("path-active");
   applyPathStep();
   setActivePathPill(pathKey);
   allPill.classList.remove("active");
@@ -1136,6 +1146,7 @@ function exitPath() {
   autoRotate = true;
   document.getElementById("path-guide").classList.remove("visible");
   document.getElementById("controls").style.display = "";
+  document.body.classList.remove("path-active");
   setActivePathPill(null);
   setActiveNav("all");
 }
@@ -1477,6 +1488,9 @@ let currentHubId = null;
 function renderContentPanel(hubId, focusItemId = null) {
   const data = ILSA_CONTENT[hubId];
   if (!data) { contentPanel.classList.remove("visible"); return; }
+  // Kill bubbles immediately — no linger over content
+  bubblesVisible = false;
+  document.querySelectorAll(".float-bubble").forEach(b => { b.style.display = "none"; b.classList.remove("fly-away","fade-away"); });
   currentHubId = hubId;
 
   document.getElementById("cp-step-badge").textContent = data.title;
