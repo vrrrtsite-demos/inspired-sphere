@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
 <meta name="author" content="Jakes Schoeman">
 <title>Inspired Living SA — Knowledge Sphere</title>
 <!--
@@ -1412,13 +1412,14 @@ function pinchDist(e) {
 container.addEventListener("touchstart", e => {
   if (e.touches.length === 2) {
     lastPinchDist = pinchDist(e);
-    isTouchDragging = true; // treat pinch as drag so no click fires
+    isTouchDragging = true;
+    e.preventDefault(); // block native browser zoom
     return;
   }
   isTouchDragging = false;
   const t = e.touches[0]; lastTouchX = t.clientX; lastTouchY = t.clientY;
   autoRotate = false;
-}, { passive: true });
+}, { passive: false }); // must be non-passive to allow preventDefault on 2-touch
 container.addEventListener("touchmove", e => {
   if (e.touches.length === 2) {
     const dist = pinchDist(e);
