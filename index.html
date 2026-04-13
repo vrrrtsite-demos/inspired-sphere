@@ -636,6 +636,9 @@ const strandB = [
 
 const rungHubs = [[0,3],[1,4],[2,5],[3,0],[4,2],[5,1]];
 
+// Pre-built lookup: hub id → hub object (avoids repeated concat+find in hot paths)
+const hubById = Object.fromEntries([...strandA, ...strandB].map(h => [h.id, h]));
+
 // ── CONTENT DATA ──────────────────────────────────────────────────────────────
 
 const ILSA_CONTENT = {
@@ -1149,7 +1152,7 @@ function updatePathGuide() {
   const p = PATHS[activePath];
   const isLast = pathStep === p.hubs.length - 1;
   const hubId = p.hubs[pathStep];
-  const hubData = strandA.concat(strandB).find(h => h.id === hubId);
+  const hubData = hubById[hubId];
   const stepText = `Step ${pathStep + 1} of ${p.hubs.length}: ${hubData ? hubData.label : hubId}`;
 
   // Bottom guide (sphere-only view)
@@ -1361,7 +1364,6 @@ let hoveredMesh = null, autoRotate = true;
 let mouseIsDown = false, isDragging = false;
 let dragStartX = 0, dragStartY = 0, lastMouseX = 0, lastMouseY = 0;
 const MIN_Z = 10, MAX_Z = 55;
-let panX = 0, panY = 0;
 
 const miniTip = document.getElementById("mini-tip");
 const mtLabel = document.getElementById("mt-label");
@@ -1439,7 +1441,7 @@ window.addEventListener("mousemove", e => {
   }
   const dx = e.clientX - lastMouseX;
   const dy = e.clientY - lastMouseY;
-  if (Math.abs(e.clientX - dragStartX) > 4 || Math.abs(e.clientY - dragStartY) > 4) isDragging = true;
+  if (Math.abs(e.clientX - dragStartX) > DRAG_THRESHOLD || Math.abs(e.clientY - dragStartY) > DRAG_THRESHOLD) isDragging = true;
   rotY += dx * 0.010; rotX += dy * 0.010;
   rotX = Math.max(-Math.PI / 2, Math.min(Math.PI / 2, rotX));
   lastMouseX = e.clientX; lastMouseY = e.clientY;
@@ -1455,9 +1457,10 @@ window.addEventListener("mouseup", e => {
 // ── TOUCH HANDLING (window-level, catches all touches) ───────────────────────
 
 let isTouchDragging = false, lastTouchX = 0, lastTouchY = 0;
-let touchStartX = 0, touchStartY = 0; // fixed origin for drag threshold
+let touchStartX = 0, touchStartY = 0;
+let touchStartedInCanvas = false; // whether current touch sequence began inside the sphere canvas
 let lastPinchDist = 0, isPinching = false;
-const DRAG_THRESHOLD = 8; // px — must move more than this to count as drag
+const DRAG_THRESHOLD = 8; // px — unified for both mouse and touch
 
 function pinchDist(e) {
   const dx = e.touches[0].clientX - e.touches[1].clientX;
@@ -1472,9 +1475,13 @@ function pointInCanvas(x, y) {
 
 window.addEventListener("touchstart", e => {
   const t0 = e.touches[0];
-  if (!pointInCanvas(t0.clientX, t0.clientY) && e.touches.length < 2) return;
+  touchStartedInCanvas = pointInCanvas(t0.clientX, t0.clientY);
+  if (!touchStartedInCanvas && e.touches.length < 2) return;
   e.preventDefault();
   if (e.touches.length >= 2) {
+    // Only intercept pinch if at least one finger is in the canvas
+    const anyInCanvas = Array.from(e.touches).some(t => pointInCanvas(t.clientX, t.clientY));
+    if (!anyInCanvas) return;
     isPinching = true;
     isTouchDragging = true;
     lastPinchDist = pinchDist(e);
@@ -1488,6 +1495,8 @@ window.addEventListener("touchstart", e => {
 }, { passive: false });
 
 window.addEventListener("touchmove", e => {
+  // Only intercept if this touch sequence started in the canvas or we're pinching
+  if (!touchStartedInCanvas && !isPinching) return;
   e.preventDefault();
   if (e.touches.length >= 2) {
     isPinching = true;
@@ -1502,7 +1511,6 @@ window.addEventListener("touchmove", e => {
     const t = e.touches[0];
     const totalDx = t.clientX - touchStartX;
     const totalDy = t.clientY - touchStartY;
-    // Only mark as drag after crossing threshold — prevents tap being eaten
     if (Math.abs(totalDx) > DRAG_THRESHOLD || Math.abs(totalDy) > DRAG_THRESHOLD) {
       isTouchDragging = true;
     }
@@ -1586,7 +1594,6 @@ function animate() {
   if (autoRotate) rotY -= 0.0025;
   updateRotationAnimation();
   pivot.rotation.y = rotY; pivot.rotation.x = rotX;
-  pivot.position.x = panX; pivot.position.y = panY;
   camera.lookAt(0, 0, 0);
   tealLight.intensity  = 1.8 + Math.sin(clock.getElapsedTime() * 1.2) * 0.2;
   oliveLight.intensity = 1.3 + Math.sin(clock.getElapsedTime() * 0.9 + 1) * 0.2;
@@ -1612,7 +1619,7 @@ function renderContentPanel(hubId, focusItemId = null) {
   document.getElementById("cp-step-badge").textContent = data.title;
   document.getElementById("cp-title").textContent = data.title;
   document.getElementById("cp-intro").textContent =
-    strandA.concat(strandB).find(h => h.id === hubId)?.tip || "";
+    hubById[hubId]?.tip || "";
 
   const itemsEl = document.getElementById("cp-items");
   itemsEl.innerHTML = "";
