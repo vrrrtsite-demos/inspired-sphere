@@ -397,13 +397,16 @@
   @media (max-width: 860px) {
     #content-panel { width: 100%; top: 52px; bottom: 44px; }
     #cp-admin-bar { position: sticky; bottom: 0; }
-    /* Path guide: compact horizontal strip above bottom bar */
+    /* Path guide: positioning only — display controlled by .visible class */
     #path-guide {
       left: 0; right: 0; bottom: 44px;
       border-radius: 0;
       max-width: 100%; min-width: 100%;
       box-sizing: border-box;
       padding: 8px 14px;
+    }
+    /* Only show as flex strip when actually visible */
+    #path-guide.visible {
       display: flex; flex-direction: row;
       align-items: center; gap: 8px; text-align: left;
     }
@@ -413,8 +416,7 @@
     #pg-exit { position: static; font-size: 10px; flex-shrink: 0; order: -1; }
     #pg-nav { flex-direction: row; gap: 6px; margin: 0; justify-content: flex-end; flex-shrink: 0; }
     #pg-nav button { padding: 5px 14px; font-size: 11px; }
-    #pg-back { display: none; } /* show only Next on mobile to keep it compact */
-    /* Content panel shrinks just enough for compact guide (~52px) */
+    #pg-back { display: none; }
     body.path-active #content-panel { bottom: 96px; }
   }
 </style>
