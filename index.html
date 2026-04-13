@@ -1400,8 +1400,10 @@ window.addEventListener("mouseup", e => {
   if (selectedHubIds.size === 0 && !activePath) autoRotate = true;
 });
 
+// ── TOUCH HANDLING (window-level, catches all touches) ───────────────────────
+
 let isTouchDragging = false, lastTouchX = 0, lastTouchY = 0;
-let lastPinchDist = 0;
+let lastPinchDist = 0, isPinching = false;
 
 function pinchDist(e) {
   const dx = e.touches[0].clientX - e.touches[1].clientX;
@@ -1409,27 +1411,44 @@ function pinchDist(e) {
   return Math.sqrt(dx * dx + dy * dy);
 }
 
-container.addEventListener("touchstart", e => {
-  if (e.touches.length === 2) {
-    lastPinchDist = pinchDist(e);
+function touchInCanvas(e) {
+  // true if at least one touch point is inside the canvas container
+  const rect = container.getBoundingClientRect();
+  return Array.from(e.touches).some(t =>
+    t.clientX >= rect.left && t.clientX <= rect.right &&
+    t.clientY >= rect.top  && t.clientY <= rect.bottom
+  );
+}
+
+window.addEventListener("touchstart", e => {
+  if (!touchInCanvas(e)) return;
+  e.preventDefault(); // always block default inside canvas (no scroll, no native zoom)
+  if (e.touches.length >= 2) {
+    isPinching = true;
     isTouchDragging = true;
-    e.preventDefault(); // block native browser zoom
+    lastPinchDist = pinchDist(e);
     return;
   }
+  isPinching = false;
   isTouchDragging = false;
-  const t = e.touches[0]; lastTouchX = t.clientX; lastTouchY = t.clientY;
+  const t = e.touches[0];
+  lastTouchX = t.clientX; lastTouchY = t.clientY;
   autoRotate = false;
-}, { passive: false }); // must be non-passive to allow preventDefault on 2-touch
-container.addEventListener("touchmove", e => {
-  if (e.touches.length === 2) {
+}, { passive: false });
+
+window.addEventListener("touchmove", e => {
+  if (!touchInCanvas(e)) return;
+  e.preventDefault();
+  if (e.touches.length >= 2) {
+    isPinching = true;
+    isTouchDragging = true;
     const dist = pinchDist(e);
-    const delta = lastPinchDist - dist;
-    camera.position.z = Math.max(MIN_Z, Math.min(MAX_Z, camera.position.z + delta * 0.08));
+    const delta = lastPinchDist - dist; // positive = fingers closer = zoom out
+    camera.position.z = Math.max(MIN_Z, Math.min(MAX_Z, camera.position.z + delta * 0.07));
     lastPinchDist = dist;
-    e.preventDefault();
     return;
   }
-  if (e.touches.length === 1) {
+  if (e.touches.length === 1 && !isPinching) {
     isTouchDragging = true;
     const t = e.touches[0];
     const dx = t.clientX - lastTouchX, dy = t.clientY - lastTouchY;
@@ -1438,12 +1457,20 @@ container.addEventListener("touchmove", e => {
     lastTouchX = t.clientX; lastTouchY = t.clientY;
     targetRotX = null; targetRotY = null;
   }
-  e.preventDefault();
 }, { passive: false });
-container.addEventListener("touchend", e => {
-  if (!isTouchDragging) { const t = e.changedTouches[0]; handleClick(t.clientX, t.clientY); }
-  isTouchDragging = false;
-  if (selectedHubIds.size === 0) autoRotate = true;
+
+window.addEventListener("touchend", e => {
+  if (e.touches.length < 2) isPinching = false;
+  if (e.touches.length === 0) {
+    if (!isTouchDragging) {
+      const t = e.changedTouches[0];
+      if (touchInCanvas(e) || (t.clientX >= container.getBoundingClientRect().left)) {
+        handleClick(t.clientX, t.clientY);
+      }
+    }
+    isTouchDragging = false;
+    if (selectedHubIds.size === 0 && !activePath) autoRotate = true;
+  }
 }, { passive: true });
 
 window.addEventListener("wheel", e => {
