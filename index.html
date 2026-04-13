@@ -101,14 +101,17 @@
   /* ── Node labels ── */
   .node-label {
     font-family: 'Fira Sans Condensed', sans-serif; font-size: 11px; font-weight: 700;
-    padding: 3px 10px; border-radius: 20px;
-    white-space: nowrap; transition: opacity 0.25s; letter-spacing: 0.1px;
+    padding: 3px 8px; border-radius: 12px;
+    white-space: normal; word-break: break-word;
+    text-align: center; line-height: 1.25;
+    max-width: 82px;
+    transition: opacity 0.25s; letter-spacing: 0.1px;
     pointer-events: auto; cursor: pointer;
   }
   .node-label.hub-a   { color: #2d6e73; background: rgba(255,255,255,0.95); border: 1.5px solid rgba(138,180,186,0.65); box-shadow: 0 2px 6px rgba(0,0,0,0.10); }
   .node-label.hub-b   { color: #4a4200; background: rgba(255,255,255,0.95); border: 1.5px solid rgba(149,142,9,0.55); box-shadow: 0 2px 6px rgba(0,0,0,0.10); }
-  .node-label.child-a { font-size: 9px; font-weight: 600; color: #8AB4BA; background: rgba(255,255,255,0.88); border: 1px solid rgba(138,180,186,0.30); padding: 1px 7px; }
-  .node-label.child-b { font-size: 9px; font-weight: 600; color: #958E09; background: rgba(255,255,255,0.88); border: 1px solid rgba(149,142,9,0.28); padding: 1px 7px; }
+  .node-label.child-a { font-size: 9px; font-weight: 600; color: #8AB4BA; background: rgba(255,255,255,0.88); border: 1px solid rgba(138,180,186,0.30); padding: 2px 5px; max-width: 62px; }
+  .node-label.child-b { font-size: 9px; font-weight: 600; color: #958E09; background: rgba(255,255,255,0.88); border: 1px solid rgba(149,142,9,0.28); padding: 2px 5px; max-width: 62px; }
 
   /* ── Mini tooltip ── */
   #mini-tip {
