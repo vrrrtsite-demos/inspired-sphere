@@ -101,17 +101,15 @@
   /* ── Node labels ── */
   .node-label {
     font-family: 'Fira Sans Condensed', sans-serif; font-size: 11px; font-weight: 700;
-    padding: 3px 8px; border-radius: 12px;
-    white-space: normal; word-break: break-word;
-    text-align: center; line-height: 1.25;
-    max-width: 82px;
-    transition: opacity 0.25s; letter-spacing: 0.1px;
+    padding: 3px 10px; border-radius: 20px;
+    white-space: nowrap; transition: opacity 0.25s; letter-spacing: 0.1px;
     pointer-events: auto; cursor: pointer;
+    transform-style: preserve-3d; will-change: transform;
   }
   .node-label.hub-a   { color: #2d6e73; background: rgba(255,255,255,0.95); border: 1.5px solid rgba(138,180,186,0.65); box-shadow: 0 2px 6px rgba(0,0,0,0.10); }
   .node-label.hub-b   { color: #4a4200; background: rgba(255,255,255,0.95); border: 1.5px solid rgba(149,142,9,0.55); box-shadow: 0 2px 6px rgba(0,0,0,0.10); }
-  .node-label.child-a { font-size: 9px; font-weight: 600; color: #8AB4BA; background: rgba(255,255,255,0.88); border: 1px solid rgba(138,180,186,0.30); padding: 2px 5px; max-width: 62px; }
-  .node-label.child-b { font-size: 9px; font-weight: 600; color: #958E09; background: rgba(255,255,255,0.88); border: 1px solid rgba(149,142,9,0.28); padding: 2px 5px; max-width: 62px; }
+  .node-label.child-a { font-size: 9px; font-weight: 600; color: #8AB4BA; background: rgba(255,255,255,0.88); border: 1px solid rgba(138,180,186,0.30); padding: 1px 7px; }
+  .node-label.child-b { font-size: 9px; font-weight: 600; color: #958E09; background: rgba(255,255,255,0.88); border: 1px solid rgba(149,142,9,0.28); padding: 1px 7px; }
 
   /* ── Mini tooltip ── */
   #mini-tip {
@@ -1022,7 +1020,7 @@ function buildSphereStrand(strandData, isA) {
     const hMat  = hubMat(isA);
     const hMesh = new THREE.Mesh(hubGeo, hMat);
     hMesh.position.copy(hPos);
-    hMesh.userData = { isHub: true, data: hub, hubId: hub.id, originalMat: hMat };
+    hMesh.userData = { isHub: true, data: hub, hubId: hub.id, originalMat: hMat, nodePhi: phi };
     pivot.add(hMesh);
     allClickable.push({ mesh: hMesh });
 
@@ -1033,12 +1031,14 @@ function buildSphereStrand(strandData, isA) {
     hLabel.position.copy(hOut.multiplyScalar(0.72));
     hMesh.add(hLabel);
     hMesh.userData.labelObj = hLabel;
+    hMesh.userData.labelEl  = hDiv; // direct element ref for rotation
 
     hubGroups[hub.id] = { hubMesh: hMesh, phi, lat, isA };
 
     hub.children.forEach((child, ci) => {
       const off = CHILD_OFFSETS[ci % CHILD_OFFSETS.length];
-      const cPos = sphPos(phi + off.dphi, lat + off.dlat);
+      const cPhi = phi + off.dphi;
+      const cPos = sphPos(cPhi, lat + off.dlat);
 
       const cg = new THREE.Mesh(cGlowGeo, glowMat(isA, false));
       cg.position.copy(cPos); pivot.add(cg);
@@ -1046,7 +1046,7 @@ function buildSphereStrand(strandData, isA) {
       const cMat  = childMat(isA);
       const cMesh = new THREE.Mesh(childGeo, cMat);
       cMesh.position.copy(cPos);
-      cMesh.userData = { isHub: false, data: child, hubId: hub.id, originalMat: cMat };
+      cMesh.userData = { isHub: false, data: child, hubId: hub.id, originalMat: cMat, nodePhi: cPhi };
       pivot.add(cMesh);
       allClickable.push({ mesh: cMesh });
 
@@ -1058,6 +1058,7 @@ function buildSphereStrand(strandData, isA) {
       cLabel.position.copy(cOut.multiplyScalar(0.45));
       cMesh.add(cLabel);
       cMesh.userData.labelObj = cLabel;
+      cMesh.userData.labelEl  = cDiv;
 
       pivot.add(new THREE.Line(
         new THREE.BufferGeometry().setFromPoints([hPos.clone(), cPos.clone()]),
@@ -1605,6 +1606,14 @@ function animate() {
   updateDepth();
   renderer.render(scene, camera);
   labelRenderer.render(scene, camera);
+  // Rotate labels to follow sphere surface — makes them look painted on
+  allClickable.forEach(({ mesh }) => {
+    const el = mesh.userData.labelEl;
+    if (!el) return;
+    const effectivePhi = (mesh.userData.nodePhi || 0) + rotY;
+    const tilt = Math.sin(effectivePhi) * -42; // ±42° max, negative = lean with sphere
+    el.style.transform = `perspective(280px) rotateY(${tilt.toFixed(1)}deg)`;
+  });
 }
 animate();
 
