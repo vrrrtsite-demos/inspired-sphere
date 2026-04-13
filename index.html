@@ -1024,14 +1024,19 @@ function buildSphereStrand(strandData, isA) {
     pivot.add(hMesh);
     allClickable.push({ mesh: hMesh });
 
-    const hDiv = document.createElement("div");
-    hDiv.className = "node-label " + (isA ? "hub-a" : "hub-b");
-    hDiv.textContent = hub.label;
-    const hLabel = new CSS2DObject(hDiv);
+    // Outer: CSS2DRenderer positions this (owns its transform).
+    // Inner: we apply rotateY to this independently — no conflict.
+    const hOuter = document.createElement("div");
+    hOuter.style.pointerEvents = "none";
+    const hInner = document.createElement("div");
+    hInner.className = "node-label " + (isA ? "hub-a" : "hub-b");
+    hInner.textContent = hub.label;
+    hOuter.appendChild(hInner);
+    const hLabel = new CSS2DObject(hOuter);
     hLabel.position.copy(hOut.multiplyScalar(0.72));
     hMesh.add(hLabel);
     hMesh.userData.labelObj = hLabel;
-    hMesh.userData.labelEl  = hDiv; // direct element ref for rotation
+    hMesh.userData.labelEl  = hInner; // inner element — safe to transform
 
     hubGroups[hub.id] = { hubMesh: hMesh, phi, lat, isA };
 
@@ -1050,15 +1055,18 @@ function buildSphereStrand(strandData, isA) {
       pivot.add(cMesh);
       allClickable.push({ mesh: cMesh });
 
-      const cDiv = document.createElement("div");
-      cDiv.className = "node-label " + (isA ? "child-a" : "child-b");
-      cDiv.textContent = child.label;
-      const cLabel = new CSS2DObject(cDiv);
+      const cOuter = document.createElement("div");
+      cOuter.style.pointerEvents = "none";
+      const cInner = document.createElement("div");
+      cInner.className = "node-label " + (isA ? "child-a" : "child-b");
+      cInner.textContent = child.label;
+      cOuter.appendChild(cInner);
+      const cLabel = new CSS2DObject(cOuter);
       const cOut = cPos.clone().normalize();
       cLabel.position.copy(cOut.multiplyScalar(0.45));
       cMesh.add(cLabel);
       cMesh.userData.labelObj = cLabel;
-      cMesh.userData.labelEl  = cDiv;
+      cMesh.userData.labelEl  = cInner; // inner — safe to rotate
 
       pivot.add(new THREE.Line(
         new THREE.BufferGeometry().setFromPoints([hPos.clone(), cPos.clone()]),
