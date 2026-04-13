@@ -352,6 +352,34 @@
     padding: 4px 14px; cursor: pointer; font-family: 'Fira Sans', sans-serif;
   }
 
+  /* ── Path bar (top of content panel when journey active) ── */
+  #cp-path-bar {
+    display: none; /* shown via body.panel-open.path-active */
+    position: absolute; top: 0; left: 0; right: 0; height: 46px; z-index: 10;
+    align-items: center; gap: 10px; padding: 0 12px;
+    background: #fff; border-bottom: 2px solid var(--pb-color, #8AB4BA);
+    box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+  }
+  #cpb-info { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 1px; }
+  #cpb-label { font-size: 9px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase;
+    color: var(--pb-color, #8AB4BA); font-family: 'Fira Sans Condensed', sans-serif; }
+  #cpb-step  { font-size: 12px; font-weight: 700; color: #222; font-family: 'Fira Sans', sans-serif; }
+  #cpb-back, #cpb-next {
+    font-family: 'Fira Sans', sans-serif; font-size: 11px; font-weight: 700;
+    padding: 5px 14px; border-radius: 20px; border: none; cursor: pointer;
+    transition: all 0.15s ease; white-space: nowrap; flex-shrink: 0;
+  }
+  #cpb-back { background: #f0f0f0; color: #666; }
+  #cpb-back:hover { background: #e0e0e0; }
+  #cpb-next { background: var(--pb-color, #8AB4BA); color: #fff; box-shadow: 0 2px 8px rgba(0,0,0,0.18); }
+  #cpb-next:hover { opacity: 0.88; }
+
+  /* When journey active + panel open: show top bar, shift inner down */
+  body.path-active.panel-open #cp-path-bar { display: flex; }
+  body.path-active.panel-open #cp-inner { top: 46px; }
+  /* When journey active + panel open: HIDE bottom path guide */
+  body.panel-open #path-guide { display: none !important; }
+
   #cp-admin-bar {
     position: absolute; bottom: 0; left: 0; right: 0;
     height: 40px; border-top: 1px solid #eee;
@@ -426,6 +454,15 @@
 
 <div id="content-panel">
   <div id="cp-resize-handle"></div>
+  <!-- Path nav bar — top of panel when journey is active -->
+  <div id="cp-path-bar">
+    <button id="cpb-back">← Back</button>
+    <div id="cpb-info">
+      <span id="cpb-label"></span>
+      <span id="cpb-step"></span>
+    </div>
+    <button id="cpb-next">Next →</button>
+  </div>
   <div id="cp-inner">
     <div id="cp-step-badge"></div>
     <div id="cp-title"></div>
@@ -1108,13 +1145,16 @@ function drawPathLines(hubs, color) {
 function updatePathGuide() {
   if (!activePath) return;
   const p = PATHS[activePath];
+  const isLast = pathStep === p.hubs.length - 1;
+  const hubId = p.hubs[pathStep];
+  const hubData = strandA.concat(strandB).find(h => h.id === hubId);
+  const stepText = `Step ${pathStep + 1} of ${p.hubs.length}: ${hubData ? hubData.label : hubId}`;
+
+  // Bottom guide (sphere-only view)
   const guide = document.getElementById("path-guide");
   guide.style.setProperty("--path-color", p.color);
   document.getElementById("pg-label").textContent = p.label;
-  const hubId = p.hubs[pathStep];
-  const hubData = strandA.concat(strandB).find(h => h.id === hubId);
-  document.getElementById("pg-step").textContent =
-    `Step ${pathStep + 1} of ${p.hubs.length}: ${hubData ? hubData.label : hubId}`;
+  document.getElementById("pg-step").textContent = stepText;
   const dots = document.getElementById("pg-dots");
   dots.innerHTML = "";
   p.hubs.forEach((_, i) => {
@@ -1123,7 +1163,16 @@ function updatePathGuide() {
     dots.appendChild(d);
   });
   document.getElementById("pg-back").style.display = pathStep === 0 ? "none" : "";
-  document.getElementById("pg-next").textContent = pathStep === p.hubs.length - 1 ? "Finish ✓" : "Next →";
+  document.getElementById("pg-next").textContent = isLast ? "Finish ✓" : "Next →";
+
+  // Top bar (content panel view)
+  const cpPathBar = document.getElementById("cp-path-bar");
+  cpPathBar.style.setProperty("--pb-color", p.color);
+  document.getElementById("cpb-label").textContent = p.label;
+  document.getElementById("cpb-step").textContent = stepText;
+  document.getElementById("cpb-back").style.display = pathStep === 0 ? "none" : "";
+  document.getElementById("cpb-next").textContent = isLast ? "Finish ✓" : "Next →";
+  document.getElementById("cpb-next").style.background = isLast ? "#27ae60" : p.color;
 }
 
 function applyPathStep() {
@@ -1555,6 +1604,7 @@ function renderContentPanel(hubId, focusItemId = null) {
   // Kill bubbles immediately — no linger over content
   bubblesVisible = false;
   document.querySelectorAll(".float-bubble").forEach(b => { b.style.display = "none"; b.classList.remove("fly-away","fade-away"); });
+  document.body.classList.add("panel-open");
   currentHubId = hubId;
 
   document.getElementById("cp-step-badge").textContent = data.title;
@@ -1658,11 +1708,25 @@ function renderContentPanel(hubId, focusItemId = null) {
   }
 }
 
-function hideContentPanel() { contentPanel.classList.remove("visible"); }
+function hideContentPanel() {
+  contentPanel.classList.remove("visible");
+  document.body.classList.remove("panel-open");
+}
 
 document.getElementById("cp-admin-toggle").addEventListener("change", e => {
   document.body.classList.toggle("admin-mode", e.target.checked);
   if (currentHubId) renderContentPanel(currentHubId);
+});
+
+// Top path bar buttons (mirror pg-back / pg-next behaviour)
+document.getElementById("cpb-back").addEventListener("click", () => {
+  if (pathStep > 0) { pathStep--; applyPathStep(); }
+});
+document.getElementById("cpb-next").addEventListener("click", () => {
+  if (!activePath) return;
+  const p = PATHS[activePath];
+  if (pathStep < p.hubs.length - 1) { pathStep++; applyPathStep(); }
+  else exitPath();
 });
 
 </script>
