@@ -417,7 +417,8 @@
     #pg-nav { flex-direction: row; gap: 6px; margin: 0; justify-content: flex-end; flex-shrink: 0; }
     #pg-nav button { padding: 5px 14px; font-size: 11px; }
     #pg-back { display: none; }
-    body.path-active #content-panel { bottom: 96px; }
+    /* Only shrink panel for bottom path guide when content panel is NOT open */
+    body.path-active:not(.panel-open) #content-panel { bottom: 96px; }
   }
 </style>
 </head>
@@ -1468,14 +1469,15 @@ function pinchDist(e) {
   return Math.sqrt(dx * dx + dy * dy);
 }
 
-function pointInCanvas(x, y) {
-  const rect = container.getBoundingClientRect();
-  return x >= rect.left && x <= rect.right && y >= rect.top && y <= rect.bottom;
+function touchTargetInCanvas(touch) {
+  // Check DOM ancestry — content panel overlaps canvas coords on mobile,
+  // so coordinate-based checks can't distinguish them. Target element can.
+  return container.contains(touch.target);
 }
 
 window.addEventListener("touchstart", e => {
   const t0 = e.touches[0];
-  touchStartedInCanvas = pointInCanvas(t0.clientX, t0.clientY);
+  touchStartedInCanvas = touchTargetInCanvas(t0);
   if (!touchStartedInCanvas && e.touches.length < 2) return;
   e.preventDefault();
   if (e.touches.length >= 2) {
@@ -1526,7 +1528,7 @@ window.addEventListener("touchend", e => {
   if (e.touches.length < 2) isPinching = false;
   if (e.touches.length === 0) {
     const t = e.changedTouches[0];
-    if (!isTouchDragging && pointInCanvas(t.clientX, t.clientY)) {
+    if (!isTouchDragging && touchStartedInCanvas) {
       handleClick(t.clientX, t.clientY);
     }
     isTouchDragging = false;
